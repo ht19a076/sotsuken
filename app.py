@@ -76,19 +76,66 @@ def detect_face():
 def upload_video():
     """ Upload video using Amazon Kinesis Video Streams Producer SDK C++ """
     start = time.time()
-    kvs_app = f"{KVS_PRODUCER_BUILD_PATH}/{APP_NAME}"
-    try:
-        subprocess.run(
-            [kvs_app, KVS_STREAM_NAME],
-            cwd=KVS_PRODUCER_BUILD_PATH,
-            timeout=RECORD_SEC
-        )
-    except subprocess.TimeoutExpired:
-        end = time.time()
-        print("record finished")
-        return start, end
-    print("record interrupted")
-    return None, None
+    camera = cv2.VideoCapture(0)
+    while True:
+        ret1, frame1 = camera.read()
+        time.sleep(0.1)
+        ret2, frame2 = camera.read()
+ 
+    #グレースケール化
+        if ret1 and ret2:
+            gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+            gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
+ 
+    #差分絶対値の計算
+            mask = cv2.absdiff(gray1,gray2)
+ 
+    #2値化
+            mask[mask< th] = 0 
+            mask[mask >= th] =255
+ 
+    #クロージング
+            mask_cl = cv2.morphologyEx(mask,cv2.MORPH_CLOSE,np.ones((50,50),np.uint8))
+     
+    #動体検出量
+            a_change = np.sum(mask_cl == 255)
+        if a_change > 5000:
+            while a_change>5000:
+                ret1, frame1 = camera.read()
+                time.sleep(0.1)
+                ret2, frame2 = camera.read()
+ 
+    #グレースケール化
+                if ret1 and ret2:
+                    gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+                    gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
+ 
+    #差分絶対値の計算
+                    mask = cv2.absdiff(gray1,gray2)
+ 
+    #2値化
+                    mask[mask< th] = 0 
+                    mask[mask >= th] =255
+ 
+    #クロージング
+                    mask_cl = cv2.morphologyEx(mask,cv2.MORPH_CLOSE,np.ones((50,50),np.uint8))
+     
+    #動体検出量
+                    a_change = np.sum(mask_cl == 255)
+                    
+                    kvs_app = f"{KVS_PRODUCER_BUILD_PATH}/{APP_NAME}"
+                    try:
+                        subprocess.run(
+                        [kvs_app, KVS_STREAM_NAME],
+                        cwd=KVS_PRODUCER_BUILD_PATH,
+                        )
+                    except subprocess.TimeoutExpired:
+                        end = time.time()
+                        print("record finished")
+                        return start, end
+                print("record interrupted")
+                return None, None
+        camera.release()
 
 
 def get_session_url(start, end):
